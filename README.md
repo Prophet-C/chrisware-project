@@ -9,3 +9,41 @@ Join the Discord https://discord.gg/979RRuMjDP
 We encourage people to help on the project and add more modding tools
 
 If you like it leave a star on the repo
+
+## Warning
+
+This mod could maybe cause a ban. Use it at your own risk. It is for offline single player only.
+
+## Step 1 Turn off Easy Anti Cheat
+
+The mod will not run while Easy Anti Cheat is on. You do this once.
+
+### Rename the anti cheat so it can not start
+
+Open PowerShell as administrator and run this
+
+```powershell
+ren "C:\Program Files (x86)\EasyAntiCheat_EOS\EasyAntiCheat_EOS.exe" EasyAntiCheat_EOS.exe.bak
+```
+
+This renames C:\Program Files (x86)\EasyAntiCheat_EOS\EasyAntiCheat_EOS.exe to EasyAntiCheat_EOS.exe.bak. Without the .exe the Easy Anti Cheat service can not start so nothing attaches to the game.
+
+### Block the anti cheat download server
+
+This stops the launcher from downloading new anti cheat files.
+
+1. Open Notepad as administrator
+2. Open C:\Windows\System32\drivers\etc\hosts
+3. Add this line at the bottom and save
+
+```
+127.0.0.1 modules-cdn.eac-prod.on.epicgames.com
+```
+
+4. Open PowerShell and run this
+
+```powershell
+ipconfig /flushdns
+```
+
+With the anti cheat off the game can not join online servers.
