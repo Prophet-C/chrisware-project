@@ -4,6 +4,8 @@ Play Star Citizen offline on your own PC
 
 You need to own Star Citizen to use this
 
+If you do not want to use the source and just want to play the offline mod get it here https://github.com/cloudyyrust/ChrisWareOffline
+
 Join the Discord https://discord.gg/979RRuMjDP
 
 We encourage people to help on the project and add more modding tools
