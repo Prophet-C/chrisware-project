@@ -9,7 +9,7 @@
 #include "loadout.h"
 #include "npc.h"
 #include "build.h"
-#include "sq42.h"
+#include "cvars.h"
 #include "missions.h"
 #include "contracts.h"
 #include "quantum.h"
@@ -97,7 +97,7 @@ static void StartOffline() {
         ResolveLoadoutApi(g_text, g_rdata);
         ResolveNpcApi(g_text);
         ResolveBuildApi(g_text, g_rdata);
-        ResolveSq42Api(g_text, g_rdata);
+        ResolveCVarsApi(g_text, g_rdata);
         ResolveMissionsApi(g_text, g_rdata);
         ResolveContractsApi(g_text, g_rdata);
         ResolveAmmoApi(g_text);
@@ -129,7 +129,7 @@ static void OnMainThreadTick() {
     ProcessLoadout();
     ProcessNpcs();
     ProcessBuild();
-    ProcessSq42();
+    ProcessCVars();
     ProcessQuantum();
     ProcessMissions();
     ProcessContracts();

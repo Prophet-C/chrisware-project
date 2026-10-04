@@ -359,119 +359,6 @@ static void DrawMainTab(bool& keepOpen) {
     }
 }
 
-static void ShipButton(const char* label, const char* cls, bool sit, float height, bool& keepOpen) {
-    const int count = Menu_ShipCount();
-    const MenuShip* ships = count > 0 ? Menu_Ships() : nullptr;
-    int index = -1;
-    for (int i = 0; ships && i < count && index < 0; ++i)
-        if (_stricmp(ships[i].name, cls) == 0) index = i;
-    ImGui::BeginDisabled(index < 0);
-    if (ImGui::Button(label, ImVec2(-1, 0))) {
-        Menu_RequestSpawn(index, height, sit, sit);
-        keepOpen = false;
-    }
-    ImGui::EndDisabled();
-    ImGui::SetItemTooltip("%s", cls);
-}
-
-static void DrawSq42Tab(bool& keepOpen) {
-    ImGui::SeparatorText("Outfits");
-    static int outfit = 0;
-    if (const int outfits = Menu_OutfitCount(); outfits > 0) {
-        if (outfit >= outfits) outfit = 0;
-        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        ImGui::SetNextItemWidth(half);
-        if (ImGui::BeginCombo("##outfit", Menu_OutfitName(outfit), ImGuiComboFlags_HeightLarge)) {
-            for (int i = 0; i < outfits; ++i) {
-                ImGui::PushID(i);
-                if (ImGui::Selectable(Menu_OutfitName(i), i == outfit)) outfit = i;
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Wear SQ42 outfit", ImVec2(-1, 0))) {
-            Menu_RequestOutfit(outfit);
-            keepOpen = false;
-        }
-    } else {
-        ImGui::TextWrapped("Loading outfits... (you need to be spawned in the universe)");
-    }
-    static bool altLens = false;
-    if (ImGui::Checkbox("SQ42 visor HUD (applies on the next Equip or outfit)", &altLens)) Menu_SetAltLens(altLens);
-
-    ImGui::SeparatorText("Settings");
-    for (int i = 0; i < Menu_Sq42SettingCount(); ++i) {
-        const int value = Menu_Sq42Setting(i);
-        bool on = value > 0;
-        ImGui::BeginDisabled(value < 0);
-        if (ImGui::Checkbox(Menu_Sq42SettingName(i), &on)) Menu_SetSq42Setting(i, on);
-        ImGui::EndDisabled();
-        ImGui::SetItemTooltip("%s", Menu_Sq42SettingTip(i));
-    }
-
-    ImGui::SeparatorText("Spawn in front of you");
-    static int thing = -1;
-    int cat = -1;
-    for (int c = 0; c < Menu_BuildCategoryCount(); ++c)
-        if (_stricmp(Menu_BuildCategoryName(c), "sq42") == 0) cat = c;
-    if (cat < 0) {
-        ImGui::TextWrapped("Loading... (you need to be spawned in the universe)");
-    } else {
-        const int n = Menu_BuildCount();
-        if (thing < 0 || thing >= n || Menu_BuildCategoryOf(thing) != cat)
-            for (thing = 0; thing < n && Menu_BuildCategoryOf(thing) != cat; ++thing) {}
-        char picked[128];
-        PrettyBuildName(picked, sizeof(picked), Menu_BuildName(thing));
-        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
-        ImGui::SetNextItemWidth(half);
-        if (ImGui::BeginCombo("##sq42thing", picked, ImGuiComboFlags_HeightLarge)) {
-            for (int i = 0; i < n; ++i) {
-                if (Menu_BuildCategoryOf(i) != cat) continue;
-                char label[160];
-                PrettyBuildName(label, sizeof(label) - 16, Menu_BuildName(i));
-                snprintf(label + strlen(label), 16, "##%d", i);
-                if (ImGui::Selectable(label, i == thing)) thing = i;
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Spawn it", ImVec2(-1, 0)) && thing < n) {
-            Menu_SpawnNearMe(thing);
-            keepOpen = false;
-        }
-        ImGui::TextDisabled("Undo and Clear base in the build section remove these too.");
-    }
-
-    ImGui::SeparatorText("Ships");
-    if (ImGui::BeginTable("##sq42ships", 2)) {
-        static const struct { const char* label; const char* cls; bool ai; } kShips[] = {
-            { "Idris-P (the Stanton's class)", "AEGS_Idris_P", false },  { "Gladius (SQ42 fighter)", "AEGS_Gladius", false },
-            { "Retaliator (has an S42 HUD)", "AEGS_Retaliator", false },   { "Starfarer (ch 5, 7, 9)", "MISC_Starfarer", false },
-            { "Avenger Stalker (S42 wreck)", "AEGS_Avenger_Stalker", false }, { "Hornet (Cal Mason's ship)", "ANVL_Hornet_F7C", false },
-            { "Vanduul Blade (AI)", "VNCL_Blade_PU_AI_VAN", true },        { "Vanduul Scythe (AI)", "VNCL_Scythe_PU_AI_VAN", true },
-            { "Vanduul Glaive (AI)", "VNCL_Glaive_PU_AI_VAN", true },      { "Vanduul Stinger (AI)", "VNCL_Stinger_PU_AI_VAN", true },
-        };
-        for (const auto& s : kShips) {
-            ImGui::TableNextColumn();
-            ShipButton(s.label, s.cls, !s.ai, s.ai ? 300.0f : 30.0f, keepOpen);
-        }
-        ImGui::EndTable();
-    }
-    ImGui::TextDisabled("Your ships put you in the pilot seat; the Vanduul ones spawn 300 m up and come for you.");
-
-    ImGui::SeparatorText("Console");
-    static char cmd[256] = "";
-    ImGui::BeginDisabled(!Menu_ConsoleReady());
-    ImGui::SetNextItemWidth(-90);
-    const bool enter = ImGui::InputTextWithHint("##console", "a console command, e.g. i_target_selector.targeting2_enabled 1",
-                                                cmd, sizeof(cmd), ImGuiInputTextFlags_EnterReturnsTrue);
-    ImGui::SameLine();
-    if ((ImGui::Button("Run", ImVec2(-1, 0)) || enter) && cmd[0]) Menu_RunConsole(cmd);
-    ImGui::EndDisabled();
-    ImGui::TextDisabled("Runs in the game's own console. What it did shows in the game's log, not here.");
-}
-
 static bool DrawMenu() {
     bool keepOpen = true;
     ImGui::SetNextWindowPos(ImVec2(0, 0));
@@ -480,26 +367,8 @@ static bool DrawMenu() {
                  ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings);
     ImGui::TextUnformatted("This mod is a work in progress and not done at all");
     ImGui::TextUnformatted("Join our Discord server https://discord.gg/bUAuKMJUJs");
-    static bool spoilersOk = false, backToMain = false;
     if (ImGui::BeginTabBar("##tabs")) {
-        if (ImGui::BeginTabItem("Main", nullptr, backToMain ? ImGuiTabItemFlags_SetSelected : 0)) { DrawMainTab(keepOpen); ImGui::EndTabItem(); }
-        backToMain = false;
-        if (ImGui::BeginTabItem("Squadron 42")) {
-            if (spoilersOk) {
-                DrawSq42Tab(keepOpen);
-            } else {
-                if (!ImGui::IsPopupOpen("Spoiler warning")) ImGui::OpenPopup("Spoiler warning");
-                if (ImGui::BeginPopupModal("Spoiler warning", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-                    ImGui::TextUnformatted("This tab could have Squadron 42 spoilers.");
-                    ImGui::TextUnformatted("Press OK to continue.");
-                    if (ImGui::Button("OK", ImVec2(120, 0))) { spoilersOk = true; ImGui::CloseCurrentPopup(); }
-                    ImGui::SameLine();
-                    if (ImGui::Button("Back", ImVec2(120, 0))) { backToMain = true; ImGui::CloseCurrentPopup(); }
-                    ImGui::EndPopup();
-                }
-            }
-            ImGui::EndTabItem();
-        }
+        if (ImGui::BeginTabItem("Main")) { DrawMainTab(keepOpen); ImGui::EndTabItem(); }
         ImGui::EndTabBar();
     }
     ImGui::End();

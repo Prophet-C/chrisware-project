@@ -12,23 +12,6 @@ static struct {
     int32_t    loadSlot = 0;
 } g_lo;
 
-static int32_t* g_mfdCast = nullptr;
-
-static void ResolveLensCvars(const Section& text, const Section& rdata) {
-    const uint8_t* name = FindCString(rdata, "pl_lensdisplay.mfdcast_enabled");
-    uint8_t* const end = text.base + text.size - 0x20;
-    for (uint8_t* p = text.base + 0x16; name && p < end; ++p) {
-        p = static_cast<uint8_t*>(memchr(p, 0x48, static_cast<size_t>(end - p)));
-        if (!p) break;
-        if (p[1] != 0x8D || p[2] != 0x15 || p + 7 + Rel32(p + 3) != name) continue;
-        if (BytesMatch(p - 0x16, "4C 8D 05") && BytesMatch(p + 0x0F, "FF 50 40")) {
-            g_mfdCast = reinterpret_cast<int32_t*>(p - 0x16 + 7 + Rel32(p - 0x13));
-            return;
-        }
-    }
-    Log("[gear] lens MFD cast setting not found; the SQ42 visor may show empty panels");
-}
-
 bool ResolveLoadoutApi(const Section& text, const Section& rdata) {
     const uint8_t* folder = FindCString(rdata, "Scripts/Loadouts/Player");
     uint8_t* const end = text.base + text.size - 7;
@@ -49,7 +32,6 @@ bool ResolveLoadoutApi(const Section& text, const Section& rdata) {
         break;
     }
     if (!g_lo.ok) Log("[gear] loadout loader not found; gear menu disabled");
-    ResolveLensCvars(text, rdata);
     return g_lo.ok;
 }
 
@@ -90,52 +72,6 @@ static bool DataFilePath(char* path, DWORD n, const char* file) {
     return true;
 }
 static bool ItemsFilePath(char* path, DWORD n) { return DataFilePath(path, n, "items.txt"); }
-
-constexpr int kMaxOutfits = 64, kMaxPieces = 16;
-struct Outfit { char name[48]; int pieces; char port[kMaxPieces][32]; char item[kMaxPieces][64]; };
-static Outfit        g_outfits[kMaxOutfits];
-static volatile LONG g_outfitCount = 0;
-static volatile LONG g_outfitRequest = -1;
-static volatile LONG g_altLens = 0;
-
-int Menu_OutfitCount() { return g_gearState == 2 ? g_outfitCount : 0; }
-const char* Menu_OutfitName(int i) { return i >= 0 && i < g_outfitCount ? g_outfits[i].name : ""; }
-void Menu_RequestOutfit(int i) { InterlockedExchange(&g_outfitRequest, i); }
-void Menu_SetAltLens(bool on) { InterlockedExchange(&g_altLens, on ? 1 : 0); }
-
-static void BuildOutfits() {
-    char path[MAX_PATH];
-    if (!DataFilePath(path, sizeof(path), "outfits.txt")) return;
-    FILE* f = _fsopen(path, "r", _SH_DENYNO);
-    if (!f) { Log("[gear] can't open %s", path); return; }
-    const uintptr_t registry = VCall<uintptr_t>(*g_tp.entitySystem, 0xC0);
-    int n = 0, unknown = 0;
-    Outfit* cur = nullptr;
-    char line[160];
-    while (fgets(line, sizeof(line), f)) {
-        line[strcspn(line, "\r\n#")] = 0;
-        char* s = line + strspn(line, " \t");
-        if (!*s) continue;
-        if (*s == '[') {
-            if (cur && cur->pieces) ++n;
-            cur = n < kMaxOutfits ? &g_outfits[n] : nullptr;
-            if (!cur) continue;
-            s[strcspn(s, "]")] = 0;
-            strncpy_s(cur->name, s + 1, _TRUNCATE);
-            cur->pieces = 0;
-            continue;
-        }
-        char port[32] = "", item[64] = "";
-        if (!cur || cur->pieces >= kMaxPieces || sscanf_s(s, "%31s %63s", port, 32, item, 64) != 2) continue;
-        if (!VCall<uintptr_t>(registry, 0x20, static_cast<const char*>(item))) { ++unknown; continue; }
-        strcpy_s(cur->port[cur->pieces], port);
-        strcpy_s(cur->item[cur->pieces++], item);
-    }
-    if (cur && cur->pieces) ++n;
-    fclose(f);
-    InterlockedExchange(&g_outfitCount, n);
-    Log("[gear] %d outfits (%d unknown items skipped)", n, unknown);
-}
 
 static int BuildGearLists() {
     char path[MAX_PATH];
@@ -196,8 +132,7 @@ static std::string Gun(const char* port, const char* gun) {
     return Item(port, gun, mag ? Item("magazine_attach", mag) : std::string());
 }
 
-struct Face;
-static std::string HeadAndMobiGlas(const std::string& onHead = std::string(), const Face* face = nullptr);
+static std::string HeadAndMobiGlas();
 
 static std::string LoadoutXml(const int picks[Gear_SlotCount]) {
     const char* torso   = Pick(picks, Gear_Torso);
@@ -228,51 +163,15 @@ static std::string LoadoutXml(const int picks[Gear_SlotCount]) {
         + "</Items></Loadout>\n";
 }
 
-struct Face { const char* head; const char* hair; const char* hairColor; const char* eyebrow; const char* teeth; const char* eyes; };
-
-static std::string HeadAndMobiGlas(const std::string& onHead, const Face* face) {
-    const char* lens = g_altLens ? "Default_LensDisplay" : "Default_LensDisplay_PU";
-    std::string head;
-    if (face && face->head) {
-        head = Item("Teeth_ItemPort", face->teeth ? face->teeth : "PU_Head_Teeth")
-             + Item("Eyes_ItemPort", face->eyes ? face->eyes : "PU_Head_Eyes", Item("Lens_ItemPort", lens));
-        if (face->eyebrow) head += Item("Eyebrow_ItemPort", face->eyebrow);
-        if (face->hair) head += Item("Hair_ItemPort", face->hair, face->hairColor ? Item("Material_Variant", face->hairColor) : std::string());
-        head = Item("Head_ItemPort", face->head, head + onHead);
-    } else {
-        head = Item("Head_ItemPort", "PU_Protos_Head",
-                    Item("Eyes_ItemPort", "Head_Eyes_Blue_01", Item("Lens_ItemPort", lens))
-                    + "<Item portName=\"Teeth_ItemPort\" itemName=\"Head_Teeth\" tag=\"Char_Accessory_Head\"/>"
-                    + "<Item portName=\"Hair_ItemPort\" itemName=\"hair_37\" tag=\"Char_Head_Hair Male\"><Items>"
-                    + Item("Material_Variant", "Hair_Var_Brown") + "</Items></Item>" + onHead);
-    }
-    return head
+static std::string HeadAndMobiGlas() {
+    return Item("Head_ItemPort", "PU_Protos_Head",
+                Item("Eyes_ItemPort", "Head_Eyes_Blue_01", Item("Lens_ItemPort", "Default_LensDisplay_PU"))
+                + "<Item portName=\"Teeth_ItemPort\" itemName=\"Head_Teeth\" tag=\"Char_Accessory_Head\"/>"
+                + "<Item portName=\"Hair_ItemPort\" itemName=\"hair_37\" tag=\"Char_Head_Hair Male\"><Items>"
+                + Item("Material_Variant", "Hair_Var_Brown") + "</Items></Item>")
         + Item("mobiglas_attach", "MobiGlas",
                "<Item portName=\"mobiglas_screen_attach\" itemName=\"PersonalMobiGlas_PU\" tag=\"MobiGlas\"/>"
                "<Item portName=\"legacy_mobiglas_screen_attach\" itemName=\"LegacyMobiGlas\" tag=\"MobiGlas\"/>");
-}
-
-static std::string OutfitXml(const Outfit& o) {
-    auto piece = [&](const char* port) -> const char* {
-        for (int i = 0; i < o.pieces; ++i) if (_stricmp(o.port[i], port) == 0) return o.item[i];
-        return nullptr;
-    };
-    std::string onSuit, onHead, onBody;
-    for (const char* p : { "Armor_Helmet", "Armor_Torso", "Armor_Arms", "Armor_Legs" })
-        if (const char* it = piece(p)) onSuit += Item(p, it);
-    for (const char* p : { "Hat_ItemPort", "Eye_Accessories_ItemPort", "Head_Accessory_ItemPort", "Head_Horn_ItemPort", "Jewellery_ItemPort" })
-        if (const char* it = piece(p)) onHead += Item(p, it);
-    for (const char* p : { "Clothing_Feet", "Clothing_Legs", "Clothing_Torso_0", "Clothing_Hands" })
-        if (const char* it = piece(p)) onBody += Item(p, it);
-    const char* belt = piece("Clothing_Torso2");
-    if (const char* t1 = piece("Clothing_Torso_1")) onBody += Item("Clothing_Torso_1", t1, belt ? Item("Clothing_Torso2", belt) : std::string());
-    const char* suit = piece("Armor_Undersuit");
-    if (suit || !onSuit.empty()) onBody += Item("Armor_Undersuit", suit ? suit : "rsi_odyssey_undersuit_01_01_01", onSuit);
-    const Face face = { piece("Head_ItemPort"), piece("Hair_ItemPort"), piece("Hair_Color"), piece("Eyebrow_ItemPort"),
-                        piece("Teeth_ItemPort"), piece("Eyes_ItemPort") };
-    const char* body = piece("Body_ItemPort");
-    return "<Loadout><Items>" + Item("Body_ItemPort", body ? body : "body_01", onBody + HeadAndMobiGlas(onHead, &face))
-        + "</Items></Loadout>\n";
 }
 
 static const char* LoadLoadout(const char* gamePath) {
@@ -309,24 +208,14 @@ static void Equip(const std::string& xml) {
 
 static void EquipPicks(const int picks[Gear_SlotCount]) { Equip(LoadoutXml(picks)); }
 
-static void WearOutfit(int i) {
-    Log("[gear] wearing outfit '%s'", g_outfits[i].name);
-    Equip(OutfitXml(g_outfits[i]));
-}
-
 void ProcessLoadout() {
     if (!g_lo.ok || !g_tp.ok) return;
-    if (g_mfdCast) {
-        if (g_altLens && *g_mfdCast != -1) *g_mfdCast = -1;
-        else if (!g_altLens && *g_mfdCast == -1) *g_mfdCast = 0;
-    }
     if (g_gearState == 1) {
         uintptr_t actor, entity;
         bool live = false;
         __try { live = GetLocalPlayer(actor, entity); } __except (EXCEPTION_EXECUTE_HANDLER) {}
         if (live) {
             __try { BuildGearLists(); } __except (EXCEPTION_EXECUTE_HANDLER) { Log("[gear] fault while reading items.txt"); }
-            __try { BuildOutfits(); } __except (EXCEPTION_EXECUTE_HANDLER) { Log("[gear] fault while reading outfits.txt"); }
             InterlockedExchange(&g_gearState, 2);
         }
     }
@@ -335,6 +224,4 @@ void ProcessLoadout() {
     g_equipRequest.pending = false;
     ReleaseSRWLockExclusive(&g_gearLock);
     if (req.pending && g_gearState == 2) EquipPicks(req.picks);
-    const LONG outfit = InterlockedExchange(&g_outfitRequest, -1);
-    if (outfit >= 0 && outfit < g_outfitCount && g_gearState == 2) WearOutfit(outfit);
 }
