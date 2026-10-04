@@ -49,3 +49,21 @@ ipconfig /flushdns
 ```
 
 With the anti cheat off the game can not join online servers.
+
+## Play online again
+
+1. Make sure the game is closed and dinput8.dll is not in your LIVE\Bin64 folder
+2. Open PowerShell as administrator and run this
+
+```powershell
+ren "C:\Program Files (x86)\EasyAntiCheat_EOS\EasyAntiCheat_EOS.exe.bak" EasyAntiCheat_EOS.exe
+```
+
+3. Remove the modules-cdn.eac-prod.on.epicgames.com line from your hosts file
+4. Run this
+
+```powershell
+ipconfig /flushdns
+```
+
+Everything is back to normal.
