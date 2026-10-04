@@ -14,6 +14,8 @@ If you like it leave a star on the repo
 
 This mod could maybe cause a ban. Use it at your own risk. It is for offline single player only.
 
+The mod does not go in your game folder the launcher script copies it in when you play and removes it when you close the game.
+
 ## Step 1 Turn off Easy Anti Cheat
 
 The mod will not run while Easy Anti Cheat is on. You do this once.
