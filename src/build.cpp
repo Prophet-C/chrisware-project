@@ -111,8 +111,6 @@ void Menu_SetBuild(int index, float reach) {
     InterlockedExchange(&g_ui.reachCm, static_cast<LONG>(reach * 100));
 }
 float Menu_BuildReach() { return g_ui.reachCm / 100.0f; }
-static volatile LONG g_spawnNearMe = -1;
-void Menu_SpawnNearMe(int index) { InterlockedExchange(&g_spawnNearMe, index); }
 void Menu_ToggleBuildMode() { InterlockedExchange(&g_ui.toggle, 1); }
 void Menu_BuildUndo() { InterlockedExchange(&g_ui.undo, 1); }
 void Menu_BuildClear() { InterlockedExchange(&g_ui.clear, 1); }
@@ -397,17 +395,6 @@ static void Clear() {
     Log("[build] base cleared");
 }
 
-static void SpawnNearMe(int index) {
-    double pos[3], rot[4];
-    bool placed = false;
-    __try { placed = PlaceNearPlayer(5.0, 0.0, g_buildNpc[index] ? 0.2 : 0.0, pos, rot); } __except (EXCEPTION_EXECUTE_HANDLER) {}
-    if (!placed) { Log("[build] couldn't find a spot in front of you for %s", g_build[index]); return; }
-    uint64_t id = 0;
-    if (const char* err = SpawnBuildable(g_build[index], pos, rot, id)) { Log("[build] spawning %s failed: %s", g_build[index], err); return; }
-    if (g_placedCount < kMaxPlaced) g_placed[g_placedCount++] = id;
-    Log("[build] spawned %s in front of you", g_build[index]);
-}
-
 static void MovePreview(const double pos[3], const double rot[4]) {
     __try {
         const uintptr_t e = EntityById(g_previewId);
@@ -450,7 +437,6 @@ void ProcessBuild() {
     const bool undoKey = Pressed(VK_BACK, back, keys && g_active);
     if (InterlockedExchange(&g_ui.undo, 0) != 0 || undoKey) Undo();
     if (InterlockedExchange(&g_ui.clear, 0)) Clear();
-    if (const LONG spawn = InterlockedExchange(&g_spawnNearMe, -1); spawn >= 0 && spawn < g_buildCount) SpawnNearMe(spawn);
     if (!g_active) return;
     if (g_freeCamFlag && !*g_freeCamFlag) {
         RemovePreview();

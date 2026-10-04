@@ -18,18 +18,7 @@ enum MenuGearSlot { Gear_Undersuit, Gear_Helmet, Gear_Torso, Gear_Arms, Gear_Leg
 int             Menu_GearCount(int slot);
 const char*     Menu_GearName(int slot, int index);
 void            Menu_RequestEquip(const int picks[Gear_SlotCount]);
-int             Menu_OutfitCount();
-const char*     Menu_OutfitName(int index);
-void            Menu_RequestOutfit(int index);
-void            Menu_SetAltLens(bool on);
-int             Menu_Sq42SettingCount();
-const char*     Menu_Sq42SettingName(int i);
-const char*     Menu_Sq42SettingTip(int i);
-int             Menu_Sq42Setting(int i);
-void            Menu_SetSq42Setting(int i, bool on);
-bool            Menu_ConsoleReady();
 void            Menu_RunConsole(const char* cmd);
-void            Menu_SpawnNearMe(int buildIndex);
 
 int             Menu_NpcCount();
 const char*     Menu_NpcName(int index);

@@ -159,7 +159,7 @@
     <ClCompile Include="loadout.cpp" />
     <ClCompile Include="npc.cpp" />
     <ClCompile Include="build.cpp" />
-    <ClCompile Include="sq42.cpp" />
+    <ClCompile Include="cvars.cpp" />
     <ClCompile Include="missions.cpp" />
     <ClCompile Include="contracts.cpp" />
     <ClCompile Include="quantum.cpp" />
@@ -182,7 +182,7 @@
     <ClInclude Include="loadout.h" />
     <ClInclude Include="npc.h" />
     <ClInclude Include="build.h" />
-    <ClInclude Include="sq42.h" />
+    <ClInclude Include="cvars.h" />
     <ClInclude Include="missions.h" />
     <ClInclude Include="contracts.h" />
     <ClInclude Include="quantum.h" />
