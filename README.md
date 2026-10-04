@@ -67,3 +67,11 @@ ipconfig /flushdns
 ```
 
 Everything is back to normal.
+
+## Important
+
+If the script window gets closed early delete dinput8.dll from your LIVE\Bin64 folder yourself before you play online.
+
+A game update can break the mod until it is updated.
+
+A log of what the mod does is saved to mod.log in the data folder.
