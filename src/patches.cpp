@@ -95,12 +95,19 @@ static PatchStatus PatchMegamapCase(const Section& text, const Section& rdata) {
     return st;
 }
 
+static bool BootIntoAllSystems() {
+    char value[16] = {};
+    const DWORD n = GetEnvironmentVariableA("SC_OFFLINE_BOOT_MAP", value, sizeof(value));
+    return n > 0 && n < sizeof(value) && _stricmp(value, "PU_All") == 0;
+}
+
 static PatchStatus PatchBootIntoPU(const Section& text, const Section& rdata) {
     PatchStatus st;
     st.expected = 1;
     const uint8_t* frontend   = FindCString(rdata, "Frontend_Main");
     const uint8_t* scFrontend = FindCString(rdata, "SC_Frontend");
-    const uint8_t* pu         = FindCString(rdata, "PU");
+    const uint8_t* allMap     = BootIntoAllSystems() ? FindCString(rdata, "MegaMap.PU_All") : nullptr;
+    const uint8_t* pu         = allMap ? allMap + 8 : FindCString(rdata, "PU");
     const uint8_t* scDefault  = FindCString(rdata, "SC_Default");
     if (!frontend || !scFrontend || !pu || !scDefault) { st.result = PatchResult::NotFound; return st; }
 
@@ -132,7 +139,7 @@ static PatchStatus PatchBootIntoPU(const Section& text, const Section& rdata) {
 static bool BootIntoPURequested() {
     char value[16] = {};
     DWORD n = GetEnvironmentVariableA("SC_OFFLINE_BOOT_MAP", value, sizeof(value));
-    return n > 0 && n < sizeof(value) && _stricmp(value, "PU") == 0;
+    return n > 0 && n < sizeof(value) && (_stricmp(value, "PU") == 0 || _stricmp(value, "PU_All") == 0);
 }
 
 static PatchStatus PatchOfflineDbPath(const Section& text, const Section& rdata) {
@@ -444,6 +451,8 @@ void LogOfflinePatches() {
     LogPatch("megamap keeps record-name case", g_megamapCasePatch);
     if (g_bootIntoPUPatch.result == PatchResult::NotRun)
         Log("[-] boot into PU: off (set SC_OFFLINE_BOOT_MAP=PU to enable)");
+    else if (BootIntoAllSystems())
+        LogPatch("boot into PU, every system (frontend request -> PU_All/SC_Default)", g_bootIntoPUPatch);
     else
         LogPatch("boot into PU (frontend request -> PU/SC_Default)", g_bootIntoPUPatch);
     LogPatch("offline player data from %USER%\\default_1.xml", g_offlineDbPatch);
